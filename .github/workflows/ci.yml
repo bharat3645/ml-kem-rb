@@ -26,21 +26,28 @@ jobs:
     # Full C2SP/CCTV accumulated pq-crystals runs: 10,000 randomized
     # keygen/encaps/decaps cycles per parameter set, squeezed into one
     # SHAKE-128 hash that must equal the published constant.
+    # One parallel job per parameter set — pure Ruby needs the time budget.
     # (Draft-era "ipd" semantics — the published hashes predate final FIPS 203;
     # the final-standard semantics are covered by the KATs in the test job.)
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - set: 512
+            hash: 845913ea5a308b803c764a9ed8e9d814ca1fd9c82ba43c7b1e64b79c7a6ec8e4
+          - set: 768
+            hash: f7db260e1137a742e05fe0db9525012812b004d29040a5b606aad3d134b548d3
+          - set: 1024
+            hash: 47ac888fe61544efc0518f46094b4f8a600965fc89822acb06dc7169d24f3543
     steps:
       - uses: actions/checkout@v5
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.4'
-      - name: ML-KEM-512 (10k tests)
-        run: ruby -Ilib test/accumulated.rb 512 10000 845913ea5a308b803c764a9ed8e9d814ca1fd9c82ba43c7b1e64b79c7a6ec8e4 ipd
-      - name: ML-KEM-768 (10k tests)
-        run: ruby -Ilib test/accumulated.rb 768 10000 f7db260e1137a742e05fe0db9525012812b004d29040a5b606aad3d134b548d3 ipd
-      - name: ML-KEM-1024 (10k tests)
-        run: ruby -Ilib test/accumulated.rb 1024 10000 47ac888fe61544efc0518f46094b4f8a600965fc89822acb06dc7169d24f3543 ipd
+      - name: ML-KEM-${{ matrix.set }} (10k tests)
+        run: ruby -Ilib test/accumulated.rb ${{ matrix.set }} 10000 ${{ matrix.hash }} ipd
 
   gem:
     runs-on: ubuntu-latest

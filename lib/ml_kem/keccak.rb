@@ -44,11 +44,26 @@ module MLKem
       end
     end.freeze
 
+    # Precomputed rho+pi wiring: PI_DST[src] = destination index, ROT[src] =
+    # left-rotation applied to lane +src+ on its way there. Derived from the
+    # same FIPS 202 definitions as RHO above.
+    PI_DST = begin
+      dst = Array.new(25)
+      (0..4).each do |x|
+        (0..4).each do |y|
+          dst[x + 5 * y] = y + 5 * ((2 * x + 3 * y) % 5)
+        end
+      end
+      dst
+    end.freeze
+    ROT = (0...25).map { |i| RHO[i % 5][i / 5] }.freeze
+
     module_function
 
     # One Keccak-f[1600] permutation over a 25-element array of 64-bit lanes
     # (index = x + 5*y). Mutates and returns +a+.
     def permute(a)
+      b = Array.new(25)
       24.times do |round|
         # theta
         c0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
@@ -69,15 +84,14 @@ module MLKem
           a[i + 4] ^= d4
         end
 
-        # rho + pi
-        b = Array.new(25)
-        (0..4).each do |x|
-          (0..4).each do |y|
-            v = a[x + 5 * y]
-            off = RHO[x][y]
-            v = (((v << off) | (v >> (64 - off))) & MASK) unless off.zero?
-            b[y + 5 * ((2 * x + 3 * y) % 5)] = v
-          end
+        # rho + pi (precomputed wiring)
+        i = 0
+        while i < 25
+          v = a[i]
+          off = ROT[i]
+          v = (((v << off) | (v >> (64 - off))) & MASK) unless off.zero?
+          b[PI_DST[i]] = v
+          i += 1
         end
 
         # chi
