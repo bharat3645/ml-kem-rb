@@ -30,7 +30,7 @@ kem.instance_variable_set(:@ipd_mode, true) if mode == 'ipd'
 
 ckpt_path = File.expand_path("accumulated-#{strength}.ckpt", __dir__)
 
-if File.exist?(ckpt_path)
+if File.size?(ckpt_path)
   rng, acc, start_i, consistency_failures, spent = Marshal.load(File.binread(ckpt_path))
 else
   # Sanity: the RNG stream must start with the documented bytes.
@@ -70,7 +70,14 @@ end
 
 got = acc.squeeze(32).unpack1('H*')
 total = (spent + (Time.now - t0)).round
-File.delete(ckpt_path) if File.exist?(ckpt_path)
+# Clear the checkpoint; fall back to truncation on restrictive mounts.
+if File.exist?(ckpt_path)
+  begin
+    File.delete(ckpt_path)
+  rescue SystemCallError
+    File.binwrite(ckpt_path, '')
+  end
+end
 if expected.nil?
   puts "hash=#{got} (#{count} tests, #{total}s, #{consistency_failures} consistency failures)"
 elsif got == expected && consistency_failures.zero?
