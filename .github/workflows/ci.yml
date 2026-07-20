@@ -17,10 +17,11 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ${{ matrix.ruby }}
-      - name: Run test suite (KATs + differential Keccak)
+      - name: Run test suite (KATs + differential Keccak + hybrid combiner)
         run: |
           ruby -Ilib test/test_keccak.rb
           ruby -Ilib test/test_ml_kem.rb
+          ruby -Ilib test/test_hybrid.rb
 
   accumulated:
     # Full C2SP/CCTV accumulated pq-crystals runs: 10,000 randomized

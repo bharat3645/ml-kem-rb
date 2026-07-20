@@ -6,7 +6,7 @@
 
 **ML-KEM (formerly CRYSTALS-Kyber), the NIST post-quantum key-encapsulation standard, in pure Ruby.** All three parameter sets (ML-KEM-512, -768, -1024), zero runtime dependencies — including the Keccak/SHAKE core, which is implemented here too. Every algorithm is verified against external known-answer tests (details below).
 
-Ruby is heading into the post-quantum transition with almost no native tooling: CNSA 2.0 requires PQC adoption starting 2027, FIPS 140-2 certificates went historical in September 2026, and the Ruby/Rails ecosystem has essentially nothing to even experiment with. This gem exists so Ruby developers can *learn, prototype, and test* ML-KEM today with readable code that follows FIPS 203's algorithm structure line by line.
+Ruby is heading into the post-quantum transition with almost no native tooling: NSA's CNSA 2.0 requires PQC support for new National Security System acquisitions starting January 2027, FIPS 140-2 certificates move to CMVP Historical status on September 21, 2026, and the Ruby/Rails ecosystem has essentially nothing to even experiment with. This gem exists so Ruby developers can *learn, prototype, and test* ML-KEM today with readable code that follows FIPS 203's algorithm structure line by line.
 
 ## Honest security framing — read this first
 
@@ -70,6 +70,43 @@ xof = MLKem::Keccak::Xof.new(168)     # incremental SHAKE-128
 xof.absorb('chunk 1'); xof.absorb('chunk 2'); xof.squeeze(64)
 ```
 
+## Hybrid X25519 + ML-KEM-768 (`MLKem::Hybrid`)
+
+Pure PQ isn't how the migration is actually happening yet: Chrome and
+Cloudflare shipped **X25519MLKEM768** (classical X25519 combined with
+ML-KEM-768) in 2024, it's now IANA-registered for TLS 1.3
+(draft-ietf-tls-ecdhe-mlkem-05), and OpenSSH has shipped an equivalent
+hybrid (`mlkem768x25519-sha256`) as its *default* key exchange since 10.0
+(April 2025). `MLKem::Hybrid` implements the TLS draft's exact wire format
+so you can prototype against it:
+
+```ruby
+require 'ml_kem/hybrid'
+
+raise 'no X25519 support' unless MLKem::Hybrid.available?
+
+client_share, state = MLKem::Hybrid.client_init
+# ... send client_share (1216 bytes) to the server ...
+
+server_share, server_secret = MLKem::Hybrid.server_respond(client_share)
+# ... send server_share (1120 bytes) back to the client ...
+
+client_secret = MLKem::Hybrid.client_finish(state, server_share)
+client_secret == server_secret # => true, 64 bytes: ss_mlkem || x25519_ss
+```
+
+X25519 comes from the `openssl` stdlib gem — not hand-rolled, same
+reasoning as this project's own "not constant-time, reference-quality"
+framing for ML-KEM: Curve25519 arithmetic is exactly the kind of thing you
+want a vetted implementation for, not a from-scratch one. That does mean
+`Hybrid` needs an openssl gem recent enough to support X25519 `PKey`
+objects, which predates this project's Ruby ≥ 3.0 floor: Ruby 3.0's
+*bundled* openssl gem (2.2.2) has no X25519 support at all.
+`Hybrid.available?` checks this at runtime; every `Hybrid` method raises a
+clear `Hybrid::Unavailable` instead of a cryptic `NoMethodError` if it's
+missing. Verified locally across the full CI Ruby matrix: skips cleanly on
+3.0, fully passes on 3.1/3.2/3.3/3.4.
+
 ## How it's verified
 
 Correctness claims in crypto are worthless without evidence. The test suite pins this implementation to four independent external sources:
@@ -84,6 +121,7 @@ Run everything locally:
 ```console
 ruby -Ilib test/test_keccak.rb
 ruby -Ilib test/test_ml_kem.rb
+ruby -Ilib test/test_hybrid.rb
 ruby -Ilib test/accumulated.rb 768 10000 f7db260e1137a742e05fe0db9525012812b004d29040a5b606aad3d134b548d3 ipd
 ```
 
@@ -97,7 +135,7 @@ The code deliberately mirrors FIPS 203's structure: `SampleNTT`, `SamplePolyCBD`
 
 ## Related tools
 
-Part of a security-tooling suite: [pqc-scan](https://github.com/bharat3645) (PQ-readiness scanner, upcoming), [agent-rules-audit](https://github.com/bharat3645/agent-rules-audit), [mcp-sentinel](https://github.com/bharat3645/mcp-sentinel), [trace2eval](https://github.com/bharat3645/trace2eval).
+Part of a security-tooling suite: [pqc-scan](https://github.com/bharat3645) (PQ-readiness scanner, upcoming — its detection rules for ML-KEM/ML-DSA/SLH-DSA and the `X25519MLKEM768` hybrid group are the same identifiers this gem's `Hybrid` module implements), [agent-rules-audit](https://github.com/bharat3645/agent-rules-audit), [mcp-sentinel](https://github.com/bharat3645/mcp-sentinel), [trace2eval](https://github.com/bharat3645/trace2eval).
 
 ## License
 
