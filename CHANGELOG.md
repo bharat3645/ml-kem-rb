@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · versioning: [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Demo recording** (`demo/ml-kem-rb-demo.cast`, linked from the README): a real `irb` session — ML-KEM-768 keygen/encaps/decaps with matching shared secrets, a tampered ciphertext showing FIPS 203's implicit rejection (no exception, a different deterministic secret comes back instead), and the `MLKem::Hybrid` X25519+ML-KEM-768 handshake. Recorded against the real gem, replayed to confirm before committing.
+
 ## [0.2.0] — 2026-07-20
 
 PQC-domain sprint: hybrid classical+PQ key exchange, the real-world

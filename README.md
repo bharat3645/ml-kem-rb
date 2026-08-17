@@ -125,6 +125,20 @@ ruby -Ilib test/test_hybrid.rb
 ruby -Ilib test/accumulated.rb 768 10000 f7db260e1137a742e05fe0db9525012812b004d29040a5b606aad3d134b548d3 ipd
 ```
 
+## Demo
+
+A real `irb` session: keygen/encaps/decaps for ML-KEM-768 with matching
+shared secrets, a tampered ciphertext showing FIPS 203's implicit
+rejection in action (no exception — a different, deterministic secret
+comes back instead), and the `MLKem::Hybrid` X25519+ML-KEM-768 handshake:
+
+```bash
+asciinema play demo/ml-kem-rb-demo.cast
+```
+
+(local playback — [install asciinema](https://asciinema.org/docs/installation)
+if you don't have it; no account/upload needed.)
+
 ## Performance
 
 Pure Ruby is not fast crypto and doesn't pretend to be (Ruby 3.0, one core, ML-KEM-768): keygen ≈ 12 ms, encaps ≈ 13 ms, decaps ≈ 16 ms. Three orders of magnitude slower than native implementations; entirely fine for tests, tooling, and prototyping.
