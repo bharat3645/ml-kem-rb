@@ -20,11 +20,22 @@ Appropriate uses: development and testing, protocol prototyping, KAT generation,
 
 ## Install
 
+> [!WARNING]
+> **Do not run `gem install ml_kem`.** This project is not published to
+> RubyGems, and that name belongs to an unrelated ML-KEM gem by a different
+> author ([MarioRgzLpz/ml_kem](https://github.com/MarioRgzLpz/ml_kem),
+> published 2025-07-05). That command *succeeds*, so you would silently
+> install someone else's cryptography instead of this implementation.
+
+Build from source:
+
 ```console
-gem install ml_kem
+git clone https://github.com/bharat3645/ml-kem-rb
+cd ml-kem-rb
+gem build ml_kem.gemspec && gem install ml_kem-*.gem
 ```
 
-Zero dependencies; Ruby ≥ 3.0. (Not yet published? `gem build ml_kem.gemspec && gem install ml_kem-*.gem`.)
+Or vendor `lib/` straight into your project — zero dependencies, Ruby ≥ 3.0.
 
 ## Usage
 
