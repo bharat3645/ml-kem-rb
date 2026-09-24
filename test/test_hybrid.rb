@@ -74,4 +74,41 @@ class TestHybrid < Minitest::Test
     share_b, = MLKem::Hybrid.client_init
     refute_equal share_a, share_b, 'client shares must not repeat across handshakes'
   end
+
+  # RFC 7748 §6.1: X25519's curve order is divisible by its cofactor, so a
+  # peer can supply a small-order public value (the all-zero raw value is
+  # the simplest) to force a fixed ECDH output. This must surface as this
+  # module's own documented Hybrid::Error, the same contract
+  # test_rejects_wrong_size_shares_with_a_clear_error already covers for
+  # malformed sizes - not as a bare OpenSSL::PKey::PKeyError, which a caller
+  # rescuing Hybrid::Error would not catch.
+  LOW_ORDER_X25519_RAW_HEX = [
+    '00' * 32, # the all-zero point (order 1)
+    '01' + '00' * 31, # the value 1 (order 1)
+  ].freeze
+
+  def test_server_respond_rejects_degenerate_x25519_client_share
+    client_share, = MLKem::Hybrid.client_init
+    ek_mlkem = client_share.byteslice(0, MLKem::Hybrid::EK_MLKEM_768_BYTES)
+
+    LOW_ORDER_X25519_RAW_HEX.each do |hex|
+      malicious_share = ek_mlkem + [hex].pack('H*')
+      err = assert_raises(MLKem::Hybrid::Error) { MLKem::Hybrid.server_respond(malicious_share) }
+      assert_match(/degenerate low-order point/, err.message)
+    end
+  end
+
+  def test_client_finish_rejects_degenerate_x25519_server_share
+    _client_share, state = MLKem::Hybrid.client_init
+    # decaps never raises on a malformed ciphertext (FIPS 203 implicit
+    # rejection - see ml_kem.rb), so any correctly-sized filler works here;
+    # only the X25519 half needs to be the attack payload under test.
+    ct_mlkem = "\x00".b * MLKem::Hybrid::CT_MLKEM_768_BYTES
+
+    LOW_ORDER_X25519_RAW_HEX.each do |hex|
+      malicious_share = ct_mlkem + [hex].pack('H*')
+      err = assert_raises(MLKem::Hybrid::Error) { MLKem::Hybrid.client_finish(state, malicious_share) }
+      assert_match(/degenerate low-order point/, err.message)
+    end
+  end
 end

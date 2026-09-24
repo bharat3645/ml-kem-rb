@@ -90,6 +90,25 @@ module MLKem
     end
     private_class_method :pkey_from_raw_public_key
 
+    # X25519 has small-order points (RFC 7748 §6.1: the curve's order is
+    # divisible by its cofactor), so a peer-supplied public value can force a
+    # fixed, predictable ECDH output regardless of either side's private key
+    # - the all-zero raw value being the simplest case. Recent OpenSSL
+    # versions already refuse to complete such a derive
+    # (EVP_PKEY_derive: failed during derivation) rather than silently
+    # returning the degenerate result, but they raise a bare
+    # OpenSSL::PKey::PKeyError - not this module's own documented Error
+    # type - so a caller that rescues Hybrid::Error to reject malformed/
+    # malicious peer shares (as intended: see test_rejects_wrong_size_shares)
+    # would not catch it. Wrapping here keeps that contract intact for this
+    # failure mode too.
+    def self.derive_x25519(own_key, peer_pkey)
+      own_key.derive(peer_pkey)
+    rescue OpenSSL::PKey::PKeyError => e
+      raise Error, "X25519 derive failed, peer public value is likely a degenerate low-order point: #{e.message}"
+    end
+    private_class_method :derive_x25519
+
     # Client state carried between client_init and client_finish. Opaque to
     # callers; only client_finish should read it.
     ClientState = Struct.new(:dk_mlkem, :x25519_key)
@@ -120,7 +139,7 @@ module MLKem
 
       server_x25519_key = OpenSSL::PKey.generate_key('X25519')
       client_x25519_pkey = pkey_from_raw_public_key(client_x25519_raw)
-      x25519_shared = server_x25519_key.derive(client_x25519_pkey)
+      x25519_shared = derive_x25519(server_x25519_key, client_x25519_pkey)
 
       server_share = ct_mlkem + raw_public_key(server_x25519_key)
       [server_share, ss_mlkem + x25519_shared]
@@ -141,7 +160,7 @@ module MLKem
       ss_mlkem = MLKEM.decaps(state.dk_mlkem, ct_mlkem)
 
       server_x25519_pkey = pkey_from_raw_public_key(server_x25519_raw)
-      x25519_shared = state.x25519_key.derive(server_x25519_pkey)
+      x25519_shared = derive_x25519(state.x25519_key, server_x25519_pkey)
 
       ss_mlkem + x25519_shared
     end
